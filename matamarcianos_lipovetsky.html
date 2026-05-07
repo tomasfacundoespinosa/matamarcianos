@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CONSUMIDOR — Un juego de Gilles Lipovetsky</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --cyan: #00ffff;
+    --red: #ff003c;
+    --yellow: #ffe600;
+    --bg: #030a03;
+    --dim: #001a00;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'VT323', monospace;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Scanlines overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  #gameWrapper {
+    position: relative;
+    width: 700px;
+    max-width: 100vw;
+  }
+
+  #header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 4px;
+    color: var(--green);
+    font-size: 18px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px var(--green);
+  }
+
+  #consciencia { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+
+  #gameCanvas {
+    display: block;
+    border: 2px solid var(--green);
+    box-shadow: 0 0 20px var(--green), inset 0 0 20px rgba(0,255,65,0.04);
+    width: 700px;
+    height: 520px;
+    max-width: 100vw;
+    cursor: none;
+  }
+
+  /* Screens */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(3,10,3,0.97);
+    z-index: 50;
+    padding: 30px;
+    text-align: center;
+  }
+
+  .screen h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green), 0 0 40px var(--green);
+    letter-spacing: 4px;
+    margin-bottom: 12px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .screen h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    color: var(--cyan);
+    text-shadow: 0 0 12px var(--cyan);
+    margin-bottom: 20px;
+    letter-spacing: 3px;
+  }
+  .screen p {
+    font-size: 20px;
+    color: var(--green);
+    max-width: 580px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    text-shadow: 0 0 6px var(--green);
+  }
+  .screen .quote {
+    font-size: 17px;
+    color: var(--yellow);
+    border-left: 3px solid var(--yellow);
+    padding-left: 14px;
+    text-align: left;
+    max-width: 520px;
+    line-height: 1.6;
+    margin: 12px 0 20px;
+    text-shadow: 0 0 8px var(--yellow);
+  }
+  .screen .btn {
+    font-family: 'VT323', monospace;
+    font-size: 24px;
+    color: var(--bg);
+    background: var(--green);
+    border: none;
+    padding: 10px 32px;
+    cursor: pointer;
+    letter-spacing: 3px;
+    margin-top: 10px;
+    box-shadow: 0 0 20px var(--green);
+    transition: all 0.1s;
+    text-shadow: none;
+  }
+  .screen .btn:hover {
+    background: var(--cyan);
+    box-shadow: 0 0 30px var(--cyan);
+  }
+  .screen .level-badge {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 6px;
+    letter-spacing: 4px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  #lives {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Noise overlay for level 3 */
+  #noiseOverlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.5s;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+  }
+
+  #flashMsg {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 22px;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--cyan);
+    text-shadow: 0 0 10px var(--cyan);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 60;
+    opacity: 0;
+    transition: opacity 0.2s;
+    top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div id="noiseOverlay"></div>
+
+<div id="gameWrapper">
+  <div id="header">
+    <span id="levelLabel">NIVEL 1</span>
+    <span id="consciencia">CONCIENCIA CRÍTICA: <span id="score">0</span></span>
+    <div id="lives">VIDAS: <span id="livesCount">3</span></div>
+  </div>
+
+  <canvas id="gameCanvas" width="700" height="520"></canvas>
+  <div id="flashMsg"></div>
+
+  <!-- START SCREEN -->
+  <div class="screen" id="startScreen">
+    <div class="level-badge">▶ UN JUEGO BASADO EN GILLES LIPOVETSKY ◀</div>
+    <h1>CONSUMIDOR</h1>
+    <h2>EL SUJETO CONTRA EL SISTEMA</h2>
+    <p>No dejes que el sistema capture tu tiempo.<br>Destruí las lógicas de consumo para ganar conciencia.</p>
+    <p style="font-size:16px; color:#888; margin-bottom:8px;">← → Mover &nbsp;|&nbsp; ESPACIO Disparar</p>
+    <button class="btn" onclick="startGame()">▶ INICIAR</button>
+  </div>
+
+  <!-- LEVEL COMPLETE SCREEN -->
+  <div class="screen" id="levelScreen" style="display:none;">
+    <div class="level-badge" id="lvlCompBadge">FASE 1 COMPLETADA</div>
+    <h1 id="lvlCompTitle">FASE SUPERADA</h1>
+    <p id="lvlCompText"></p>
+    <div class="quote" id="lvlQuote"></div>
+    <button class="btn" id="lvlBtn" onclick="nextLevel()">SIGUIENTE FASE ▶</button>
+  </div>
+
+  <!-- GAME OVER SCREEN -->
+  <div class="screen" id="gameOverScreen" style="display:none;">
+    <h1 style="color:var(--red); text-shadow: 0 0 20px var(--red);">CAPTURADO</h1>
+    <p>El sistema absorbió tu tiempo y tu atención.<br>Conciencia crítica acumulada: <span id="finalScore" style="color:var(--yellow)">0</span></p>
+    <div class="quote" style="color:#ff8888; border-color:#ff4444;">
+      "La sociedad de consumo no es solo un orden económico, es una forma de civilización."<br>
+      <small>— Gilles Lipovetsky</small>
+    </div>
+    <button class="btn" style="background:var(--red); box-shadow: 0 0 20px var(--red);" onclick="resetGame()">↩ REINTENTAR</button>
+  </div>
+
+  <!-- WIN SCREEN -->
+  <div class="screen" id="winScreen" style="display:none;">
+    <div class="level-badge">✦ CONCIENCIA LIBERADA ✦</div>
+    <h1>¡LIBRE!</h1>
+    <p>Destruiste todas las lógicas de consumo.<br>Tu conciencia crítica total: <span id="winScore" style="color:var(--yellow)">0</span></p>
+    <div class="quote">
+      "La modernidad consumista ha creado individuos más libres y más dependientes al mismo tiempo."<br>
+      <small>— Gilles Lipovetsky</small>
+    </div>
+    <button class="btn" onclick="resetGame()">↩ VOLVER A JUGAR</button>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = 700, H = 520;
+
+// Level configs
+const LEVELS = [
+  {
+    num: 1,
+    title: "EL DESPEGUE DEL CONSUMO",
+    subtitle: "1880 — II GUERRA MUNDIAL",
+    enemyTypes: ['marca','empaque','publicidad'],
+    rows: 3, cols: 8,
+    enemySpeed: 0.6,
+    bulletSpeed: 4,
+    shootChance: 0.0004,
+    concepts: ['Ruptura con Don Raúl','Sello de confianza','Fraccionamiento','Estandarización','Marca nacional','Packaging moderno'],
+    quote: '"La producción en masa exigió el consumo en masa, lo que requirió una nueva cultura del consumidor compatible con la publicidad, con el deseo de nuevas categorías de bienes materiales."\n— Gilles Lipovetsky, La Felicidad Paradójica',
+    badge: 'FASE 1 COMPLETADA',
+    compText: 'Las primeras lógicas del mercado masivo han sido superadas. La marca, el empaque y la publicidad intentaron capturar tu identidad.',
+    erratic: false,
+    bgColor: '#030a03',
+  },
+  {
+    num: 2,
+    title: "LA SOCIEDAD DEL DESEO",
+    subtitle: "EL CONSUMIDOR SEDUCIDO",
+    enemyTypes: ['carrito','tarjeta'],
+    rows: 3, cols: 9,
+    enemySpeed: 1.1,
+    bulletSpeed: 5,
+    shootChance: 0.0007,
+    concepts: ['Porque vos lo valés','Obsolescencia programada','Pérdida de noción tiempo/espacio','Crédito fácil','Deseo infinito','Seducción del mercado'],
+    quote: '"La sociedad de consumo se presenta como portadora de una promesa de felicidad materializada en el bienestar, el confort y los placeres del ocio. El deseo se convierte en motor de la economía."\n— Gilles Lipovetsky, El Imperio de lo Efímero',
+    badge: 'FASE 2 COMPLETADA',
+    compText: 'La sociedad del deseo cayó. El carrito de compras y la tarjeta de crédito ya no pueden atraparte en su espiral.',
+    erratic: false,
+    bgColor: '#050008',
+  },
+  {
+    num: 3,
+    title: "HIPERCONSUMO",
+    subtitle: "ECONOMÍA DE LA ATENCIÓN",
+    enemyTypes: ['red','pildora'],
+    rows: 4, cols: 9,
+    enemySpeed: 1.6,
+    bulletSpeed: 6,
+    shootChance: 0.0012,
+    concepts: ['Capitalización del tiempo de vida','Ansiedad colectiva','Ludopatía digital','Dopamina on demand','Algoritmo de captura','Hiperindividualismo','Fatiga digital'],
+    quote: '"En la era del hiperconsumo, el tiempo libre ya no escapa a la lógica mercantil: la atención humana se ha vuelto el recurso más codiciado y explotado del capitalismo contemporáneo."\n— Gilles Lipovetsky, La Pantalla Global',
+    badge: 'NIVEL FINAL SUPERADO',
+    compText: '¡Conciencia crítica máxima! Las redes sociales y la medicalización del malestar no pudieron con tu lucidez.',
+    erratic: true,
+    bgColor: '#08000a',
+  }
+];
+
+const LEVEL_QUOTES = [
+  '"La producción en masa exigió el consumo en masa, lo que requirió una nueva cultura del consumidor compatible con la publicidad."\n— Gilles Lipovetsky',
+  '"El deseo se convierte en motor de la economía. La sociedad de consumo promete felicidad materializada en bienestar y confort."\n— Gilles Lipovetsky',
+  '"En la era del hiperconsumo, el tiempo libre ya no escapa a la lógica mercantil: la atención humana es el recurso más codiciado."\n— Gilles Lipovetsky',
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let gameState = 'start';
+let currentLevel = 0;
+let score = 0;
+let lives = 3;
+let player, enemies, bullets, enemyBullets, particles;
+let flashMessages = [];
+let levelDir = 1;
+let levelTimer = 0;
+let animFrame;
+let stars = [];
+let keys = {};
+let shootCooldown = 0;
+let levelCfg;
+let noiseTick = 0;
+let bgPulse = 0;
+let erraticOffsets = [];
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 80; i++) {
+    stars.push({ x: Math.random()*W, y: Math.random()*H, s: Math.random()*2+0.3, sp: Math.random()*0.3+0.1 });
+  }
+}
+
+function initLevel(lvlIdx) {
+  levelCfg = LEVELS[lvlIdx];
+  levelDir = 1;
+  levelTimer = 0;
+  bullets = [];
+  enemyBullets = [];
+  particles = [];
+  flashMessages = [];
+  erraticOffsets = [];
+
+  // Player
+  player = { x: W/2, y: H - 55, w: 36, h: 28, speed: 4.5, shooting: false };
+
+  // Enemies grid
+  enemies = [];
+  const types = levelCfg.enemyTypes;
+  const cols = levelCfg.cols, rows = levelCfg.rows;
+  const spacingX = Math.floor((W - 80) / cols);
+  const spacingY = 52;
+  const startX = 40;
+  const startY = 55;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const type = types[(r + c) % types.length];
+      const e = {
+        x: startX + c * spacingX,
+        y: startY + r * spacingY,
+        w: 38, h: 32,
+        type,
+        alive: true,
+        animTick: Math.random() * 100,
+      };
+      enemies.push(e);
+      erraticOffsets.push({ ox: 0, oy: 0, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2 });
+    }
+  }
+
+  updateHUD();
+  setNoiseLevel(lvlIdx);
+}
+
+function setNoiseLevel(lvl) {
+  const noise = document.getElementById('noiseOverlay');
+  noise.style.opacity = lvl === 2 ? '1' : '0';
+  if (lvl === 2) {
+    noise.style.mixBlendMode = 'screen';
+  }
+}
+
+// ─── DRAWING ──────────────────────────────────────────────────────────────────
+function drawBg() {
+  const lvl = currentLevel;
+  // Background gradient per level
+  const bgs = ['#030a03','#050008','#0a0006'];
+  ctx.fillStyle = bgs[Math.min(lvl, 2)];
+  ctx.fillRect(0, 0, W, H);
+
+  if (lvl === 2) {
+    // Saturated noise bg pulse
+    bgPulse += 0.02;
+    const r = Math.sin(bgPulse) * 8 + 8;
+    ctx.fillStyle = `rgba(${r*4},0,${r*6},0.06)`;
+    ctx.fillRect(0, 0, W, H);
+    // Random flickering pixels
+    for (let i = 0; i < 30; i++) {
+      const rx = Math.random()*W, ry = Math.random()*H;
+      const cols2 = ['#ff00ff','#00ffff','#ff0090','#ffff00'];
+      ctx.fillStyle = cols2[Math.floor(Math.random()*cols2.length)];
+      ctx.globalAlpha = Math.random()*0.4;
+      ctx.fillRect(rx, ry, 2, 2);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Stars
+  ctx.fillStyle = lvl === 2 ? '#ffffff' : '#00ff41';
+  for (const s of stars) {
+    s.y += s.sp;
+    if (s.y > H) { s.y = 0; s.x = Math.random()*W; }
+    ctx.globalAlpha = lvl === 2 ? Math.random()*0.8+0.2 : 0.5;
+    ctx.fillRect(s.x, s.y, s.s, s.s);
+  }
+  ctx.globalAlpha = 1;
+
+  // Grid lines for level 3
+  if (lvl === 2) {
+    ctx.strokeStyle = 'rgba(255,0,200,0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  }
+}
+
+function drawPlayer() {
+  const p = player;
+  const lvl = currentLevel;
+  const glowColor = lvl === 2 ? '#ff00ff' : lvl === 1 ? '#00aaff' : '#00ff41';
+
+  ctx.save();
+  ctx.translate(p.x + p.w/2, p.y + p.h/2);
+
+  // Engine glow
+  ctx.shadowColor = glowColor;
+  ctx.shadowBlur = 18;
+
+  // Body
+  ctx.fillStyle = glowColor;
+  ctx.beginPath();
+  ctx.moveTo(0, -p.h/2);
+  ctx.lineTo(-p.w/2, p.h/2);
+  ctx.lineTo(-p.w/4, p.h/4);
+  ctx.lineTo(0, p.h/3);
+  ctx.lineTo(p.w/4, p.h/4);
+  ctx.lineTo(p.w/2, p.h/2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cockpit
+  ctx.fillStyle = '#000';
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 6, 9, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = glowColor;
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 3, 5, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Thruster flame
+  const t = Date.now() / 80;
+  ctx.fillStyle = `rgba(255,140,0,${0.6+Math.sin(t)*0.4})`;
+  ctx.shadowColor = 'orange';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(-6, p.h/2);
+  ctx.lineTo(0, p.h/2 + 10 + Math.sin(t)*4);
+  ctx.lineTo(6, p.h/2);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawEnemyMarca(x, y, w, h, tick) {
+  // Brand / Marca — M shape with logo feel
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  const glow = Math.sin(tick*0.05)*0.5+0.5;
+  ctx.shadowColor = '#ff6600';
+  ctx.shadowBlur = 10 + glow*8;
+  ctx.fillStyle = '#ff6600';
+  // M shape
+  ctx.font = 'bold 26px VT323';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('M', 0, 0);
+  // ® badge
+  ctx.font = '10px VT323';
+  ctx.fillStyle = '#ffcc00';
+  ctx.fillText('®', 13, -8);
+  ctx.restore();
+}
+
+function drawEnemyEmpaque(x, y, w, h, tick) {
+  // Package / box
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  ctx.shadowColor = '#ffe600';
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = '#ffe600';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-13, -11, 26, 22);
+  // ribbon
+  ctx.beginPath();
+  ctx.moveTo(-13, 0); ctx.lineTo(13, 0); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, -11); ctx.lineTo(0, 11); ctx.stroke();
+  // bow
+  ctx.fillStyle = '#ffe600';
+  ctx.beginPath();
+  ctx.arc(-4, -11, 3, 0, Math.PI*2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(4, -11, 3, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemyPublicidad(x, y, w, h, tick) {
+  // Billboard / ad with flashing colors
+  const cols = ['#ff003c','#ff6600','#ffe600','#00ff41'];
+  const c = cols[Math.floor(tick/15)%cols.length];
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  ctx.shadowColor = c;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = c;
+  ctx.fillRect(-15, -10, 30, 18);
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 10px VT323';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('AD', 0, 0);
+  // pole
+  ctx.fillStyle = c;
+  ctx.fillRect(-2, 8, 4, 8);
+  ctx.restore();
+}
+
+function drawEnemyCarrito(x, y, w, h, tick) {
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  const bounce = Math.sin(tick*0.07)*2;
+  ctx.translate(0, bounce);
+  ctx.shadowColor = '#00aaff';
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = '#00aaff';
+  ctx.lineWidth = 2;
+  // Cart body
+  ctx.beginPath();
+  ctx.moveTo(-14, -10);
+  ctx.lineTo(-14, 4);
+  ctx.lineTo(14, 4);
+  ctx.lineTo(10, -10);
+  ctx.closePath();
+  ctx.stroke();
+  // Handle
+  ctx.beginPath();
+  ctx.moveTo(-14, -10);
+  ctx.lineTo(-18, -14);
+  ctx.stroke();
+  // Wheels
+  ctx.fillStyle = '#00aaff';
+  ctx.beginPath(); ctx.arc(-8, 8, 4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(6, 8, 4, 0, Math.PI*2); ctx.fill();
+  // $ sign
+  ctx.fillStyle = '#ffe600';
+  ctx.font = '12px VT323';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('$', 0, -3);
+  ctx.restore();
+}
+
+function drawEnemyTarjeta(x, y, w, h, tick) {
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  const glow = Math.sin(tick*0.08)*0.5+0.5;
+  ctx.shadowColor = '#cc00ff';
+  ctx.shadowBlur = 8 + glow*8;
+  // Card
+  ctx.fillStyle = '#220044';
+  ctx.fillRect(-18, -10, 36, 20);
+  ctx.strokeStyle = '#cc00ff';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-18, -10, 36, 20);
+  // Chip
+  ctx.fillStyle = '#ffe600';
+  ctx.fillRect(-10, -4, 8, 8);
+  // Stripe
+  ctx.fillStyle = '#cc00ff';
+  ctx.fillRect(-18, -3, 36, 6);
+  ctx.fillStyle = '#220044';
+  ctx.font = '9px VT323';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('VISA∞', 0, 6);
+  ctx.restore();
+}
+
+function drawEnemyRed(x, y, w, h, tick) {
+  // Social media icon — thumbs up / like with addiction blink
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  const blink = (Math.floor(tick/8) % 4 === 0) ? 1.4 : 1;
+  ctx.scale(blink, blink);
+  const cols = ['#1877f2','#e1306c','#ff0000','#1da1f2','#ff6600'];
+  const c = cols[Math.floor(tick/20)%cols.length];
+  ctx.shadowColor = c;
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = c;
+  // Thumb
+  ctx.beginPath();
+  ctx.roundRect(-10, -5, 20, 14, 3);
+  ctx.fill();
+  // Thumb up
+  ctx.fillStyle = '#fff';
+  ctx.font = '16px VT323';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('👍', 0, 2);
+  // Notification dot
+  ctx.fillStyle = '#ff0000';
+  ctx.beginPath(); ctx.arc(10, -10, 5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '8px VT323';
+  ctx.fillText('!', 10, -10);
+  ctx.restore();
+}
+
+function drawEnemyPildora(x, y, w, h, tick) {
+  // Pill — medicalización
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  const angle = Math.sin(tick*0.06)*0.3;
+  ctx.rotate(angle);
+  ctx.shadowColor = '#ff00aa';
+  ctx.shadowBlur = 12;
+  // Pill halves
+  ctx.fillStyle = '#ff00aa';
+  ctx.beginPath();
+  ctx.ellipse(-7, 0, 12, 8, 0, Math.PI/2, 3*Math.PI/2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(7, 0, 12, 8, 0, -Math.PI/2, Math.PI/2);
+  ctx.fill();
+  // divider
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(0,8); ctx.stroke();
+  // Rx
+  ctx.fillStyle = '#ff00aa';
+  ctx.font = 'bold 10px VT323';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Rx', 7, 0);
+  ctx.restore();
+}
+
+function drawEnemy(e, idx) {
+  if (!e.alive) return;
+  e.animTick++;
+  let dx = 0, dy = 0;
+  if (levelCfg && levelCfg.erratic) {
+    const eo = erraticOffsets[idx];
+    eo.vx += (Math.random()-0.5)*0.4;
+    eo.vy += (Math.random()-0.5)*0.3;
+    eo.vx *= 0.85; eo.vy *= 0.85;
+    eo.ox += eo.vx; eo.oy += eo.vy;
+    eo.ox = Math.max(-8, Math.min(8, eo.ox));
+    eo.oy = Math.max(-5, Math.min(5, eo.oy));
+    dx = eo.ox; dy = eo.oy;
+  }
+  const ex = e.x + dx, ey = e.y + dy;
+  switch (e.type) {
+    case 'marca':     drawEnemyMarca(ex, ey, e.w, e.h, e.animTick); break;
+    case 'empaque':   drawEnemyEmpaque(ex, ey, e.w, e.h, e.animTick); break;
+    case 'publicidad':drawEnemyPublicidad(ex, ey, e.w, e.h, e.animTick); break;
+    case 'carrito':   drawEnemyCarrito(ex, ey, e.w, e.h, e.animTick); break;
+    case 'tarjeta':   drawEnemyTarjeta(ex, ey, e.w, e.h, e.animTick); break;
+    case 'red':       drawEnemyRed(ex, ey, e.w, e.h, e.animTick); break;
+    case 'pildora':   drawEnemyPildora(ex, ey, e.w, e.h, e.animTick); break;
+  }
+}
+
+function drawBullets() {
+  for (const b of bullets) {
+    ctx.save();
+    ctx.shadowColor = b.color || '#00ff41';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = b.color || '#00ff41';
+    ctx.fillRect(b.x - 2, b.y - 8, 4, 12);
+    ctx.restore();
+  }
+  for (const b of enemyBullets) {
+    ctx.save();
+    ctx.shadowColor = '#ff003c';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ff003c';
+    ctx.fillRect(b.x - 2, b.y, 4, 10);
+    ctx.restore();
+  }
+}
+
+function drawParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.life--;
+    p.vy += 0.08;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 6;
+    ctx.fillRect(p.x, p.y, p.s, p.s);
+    ctx.restore();
+  }
+}
+
+function drawFlashMessages() {
+  const now = Date.now();
+  for (let i = flashMessages.length - 1; i >= 0; i--) {
+    const m = flashMessages[i];
+    const age = now - m.time;
+    if (age > 2000) { flashMessages.splice(i, 1); continue; }
+    const alpha = 1 - age / 2000;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = '18px "Share Tech Mono"';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = m.color || '#00ffff';
+    ctx.shadowColor = m.color || '#00ffff';
+    ctx.shadowBlur = 10;
+    ctx.fillText(m.text, m.x, m.y - (age / 2000) * 40);
+    ctx.restore();
+  }
+}
+
+function drawGroundLine() {
+  ctx.save();
+  ctx.strokeStyle = currentLevel === 2 ? '#ff00ff' : '#00ff41';
+  ctx.shadowColor = currentLevel === 2 ? '#ff00ff' : '#00ff41';
+  ctx.shadowBlur = 8;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, H - 30);
+  ctx.lineTo(W, H - 30);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ─── UPDATE ───────────────────────────────────────────────────────────────────
+function updatePlayer() {
+  if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
+  if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
+  player.x = Math.max(0, Math.min(W - player.w, player.x));
+
+  if (shootCooldown > 0) shootCooldown--;
+  if ((keys[' '] || keys['ArrowUp']) && shootCooldown === 0) {
+    const bColor = currentLevel === 2 ? '#ff00ff' : currentLevel === 1 ? '#00aaff' : '#00ff41';
+    bullets.push({ x: player.x + player.w/2, y: player.y, color: bColor });
+    shootCooldown = 18;
+  }
+}
+
+function updateBullets() {
+  const speed = levelCfg.bulletSpeed;
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].y -= speed;
+    if (bullets[i].y < 0) bullets.splice(i, 1);
+  }
+  for (let i = enemyBullets.length - 1; i >= 0; i--) {
+    enemyBullets[i].y += 3.5;
+    if (enemyBullets[i].y > H) enemyBullets.splice(i, 1);
+  }
+}
+
+function updateEnemies() {
+  const alive = enemies.filter(e => e.alive);
+  if (alive.length === 0) return;
+
+  levelTimer++;
+  const speed = levelCfg.enemySpeed;
+
+  // Move as grid
+  let minX = Infinity, maxX = -Infinity;
+  for (const e of alive) { minX = Math.min(minX, e.x); maxX = Math.max(maxX, e.x + e.w); }
+
+  let dropDown = false;
+  if ((levelDir === 1 && maxX >= W - 10) || (levelDir === -1 && minX <= 10)) {
+    levelDir *= -1;
+    dropDown = true;
+  }
+
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (!e.alive) continue;
+    e.x += speed * levelDir;
+    if (dropDown) e.y += 18;
+
+    // Enemy shoot
+    if (Math.random() < levelCfg.shootChance) {
+      enemyBullets.push({ x: e.x + e.w/2, y: e.y + e.h });
+    }
+  }
+}
+
+function checkCollisions() {
+  // Player bullets vs enemies
+  for (let bi = bullets.length - 1; bi >= 0; bi--) {
+    const b = bullets[bi];
+    for (let ei = 0; ei < enemies.length; ei++) {
+      const e = enemies[ei];
+      if (!e.alive) continue;
+      const offset = levelCfg.erratic ? erraticOffsets[ei] : { ox: 0, oy: 0 };
+      const ex = e.x + offset.ox, ey = e.y + offset.oy;
+      if (b.x > ex && b.x < ex + e.w && b.y > ey && b.y < ey + e.h) {
+        e.alive = false;
+        bullets.splice(bi, 1);
+        score += 10;
+        updateHUD();
+        spawnParticles(ex + e.w/2, ey + e.h/2);
+        spawnConcept(ex + e.w/2, ey);
+        break;
+      }
+    }
+  }
+
+  // Enemy bullets vs player
+  for (let bi = enemyBullets.length - 1; bi >= 0; bi--) {
+    const b = enemyBullets[bi];
+    const px = player.x, py = player.y, pw = player.w, ph = player.h;
+    if (b.x > px && b.x < px+pw && b.y > py && b.y < py+ph) {
+      enemyBullets.splice(bi, 1);
+      lives--;
+      updateHUD();
+      if (lives <= 0) { triggerGameOver(); return; }
+    }
+  }
+
+  // Enemies reach ground
+  for (const e of enemies) {
+    if (e.alive && e.y + e.h > H - 30) {
+      triggerGameOver();
+      return;
+    }
+  }
+}
+
+function spawnParticles(x, y) {
+  const lvlColors = [
+    ['#ff6600','#ffe600','#ff003c'],
+    ['#00aaff','#cc00ff','#00ffff'],
+    ['#ff00ff','#ff0090','#ffff00','#00ffff','#ff6600']
+  ];
+  const colors = lvlColors[Math.min(currentLevel, 2)];
+  for (let i = 0; i < 14; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*5,
+      vy: (Math.random()-0.5)*5,
+      life: 30 + Math.random()*20,
+      maxLife: 50,
+      s: Math.random()*4+1,
+      color: colors[Math.floor(Math.random()*colors.length)]
+    });
+  }
+}
+
+function spawnConcept(x, y) {
+  const concepts = levelCfg.concepts;
+  const text = concepts[Math.floor(Math.random()*concepts.length)];
+  const colors = ['#00ffff','#ffe600','#ff00aa','#00ff41'];
+  flashMessages.push({
+    text, x, y,
+    time: Date.now(),
+    color: colors[Math.floor(Math.random()*colors.length)]
+  });
+}
+
+// ─── SCREENS ─────────────────────────────────────────────────────────────────
+function showLevelComplete() {
+  gameState = 'levelcomplete';
+  const cfg = LEVELS[currentLevel];
+  document.getElementById('lvlCompBadge').textContent = cfg.badge;
+  document.getElementById('lvlCompTitle').textContent = `FASE ${cfg.num} SUPERADA`;
+  document.getElementById('lvlCompText').textContent = cfg.compText;
+  document.getElementById('lvlQuote').textContent = cfg.quote;
+
+  const btn = document.getElementById('lvlBtn');
+  if (currentLevel >= LEVELS.length - 1) {
+    btn.textContent = 'VER RESULTADO FINAL ▶';
+    btn.onclick = showWin;
+  } else {
+    btn.textContent = 'SIGUIENTE FASE ▶';
+    btn.onclick = nextLevel;
+  }
+
+  document.getElementById('levelScreen').style.display = 'flex';
+}
+
+function showWin() {
+  document.getElementById('levelScreen').style.display = 'none';
+  document.getElementById('winScore').textContent = score;
+  document.getElementById('winScreen').style.display = 'flex';
+  setNoiseLevel(-1);
+  gameState = 'win';
+}
+
+function triggerGameOver() {
+  gameState = 'gameover';
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('gameOverScreen').style.display = 'flex';
+  setNoiseLevel(-1);
+  cancelAnimationFrame(animFrame);
+}
+
+function nextLevel() {
+  document.getElementById('levelScreen').style.display = 'none';
+  currentLevel++;
+  if (currentLevel >= LEVELS.length) { showWin(); return; }
+  initLevel(currentLevel);
+  document.getElementById('levelLabel').textContent = `NIVEL ${currentLevel+1}`;
+  gameState = 'playing';
+  loop();
+}
+
+function startGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  currentLevel = 0;
+  score = 0;
+  lives = 3;
+  initLevel(0);
+  gameState = 'playing';
+  document.getElementById('levelLabel').textContent = 'NIVEL 1';
+  loop();
+}
+
+function resetGame() {
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('winScreen').style.display = 'none';
+  document.getElementById('levelScreen').style.display = 'none';
+  cancelAnimationFrame(animFrame);
+  currentLevel = 0;
+  score = 0;
+  lives = 3;
+  initLevel(0);
+  gameState = 'playing';
+  document.getElementById('levelLabel').textContent = 'NIVEL 1';
+  updateHUD();
+  loop();
+}
+
+function updateHUD() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('livesCount').textContent = lives;
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────────
+function loop() {
+  if (gameState !== 'playing') return;
+
+  ctx.clearRect(0, 0, W, H);
+  drawBg();
+  drawGroundLine();
+  drawPlayer();
+  enemies.forEach((e, i) => drawEnemy(e, i));
+  drawBullets();
+  drawParticles();
+  drawFlashMessages();
+
+  updatePlayer();
+  updateBullets();
+  updateEnemies();
+  checkCollisions();
+
+  // Check level complete
+  if (enemies.filter(e => e.alive).length === 0) {
+    showLevelComplete();
+    return;
+  }
+
+  animFrame = requestAnimationFrame(loop);
+}
+
+// ─── INPUT ────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === ' ') e.preventDefault();
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+initStars();
+
+// Draw idle starfield while on start screen
+function idleLoop() {
+  if (gameState !== 'start') return;
+  ctx.fillStyle = '#030a03';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#00ff41';
+  for (const s of stars) {
+    s.y += s.sp;
+    if (s.y > H) { s.y = 0; s.x = Math.random()*W; }
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(s.x, s.y, s.s, s.s);
+  }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(idleLoop);
+}
+idleLoop();
+</script>
+</body>
+</html>
